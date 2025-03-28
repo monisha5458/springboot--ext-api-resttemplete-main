@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "monisha579/springboot-app-extapi"
+        K8S_DEPLOYMENT = "springboot-app"
+        K8S_NAMESPACE = "default"
+        DOCKER_USERNAME = "monisha579"
+        DOCKER_PASSWORD = "Mouna@1234"  // ⚠️ (Security Risk! Use Jenkins Credentials Instead)
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/monisha5458/springboot-docker-app.git'
+            }
+        }
+
+        stage('Build & Package') {
+            steps {
+                bat "mvnw.cmd clean package -DskipTests"
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat "docker build -t ${DOCKER_IMAGE}:latest ."
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                bat "docker login -u %DOCKER_USERNAME% -p %DOCKER_PASSWORD%"
+            }
+        }
+
+        stage('Push Image to Docker Hub') {
+            steps {
+                bat "docker push ${DOCKER_IMAGE}:latest"
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                bat """
+                kubectl apply -f deployment.yaml
+                kubectl set image deployment/${K8S_DEPLOYMENT} ${K8S_DEPLOYMENT}=${DOCKER_IMAGE}:latest --namespace=${K8S_NAMESPACE}
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Deployment Successful!'
+        }
+        failure {
+            echo '❌ Deployment Failed!'
+        }
+    }
+}
